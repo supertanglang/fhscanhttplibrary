@@ -830,7 +830,7 @@ PREQUEST HTTPAPI::SendHttpRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request,HTTPC
 			if (RedirectedData)
 			{
 				free(Location);
-				DATA->request=NULL; /* We are reutilizing the same request, so avoid deleting memory twice */
+				//DATA->request=NULL; /* We are reutilizing the same request, so avoid deleting memory twice */
 				delete DATA;
 				return (RedirectedData);
 			}
