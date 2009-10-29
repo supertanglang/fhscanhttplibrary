@@ -548,7 +548,7 @@ PHTTP_DATA HTTPAPI::BuildHTTPRequest(
 		* We need to send a "CONNECT" verb to the HTTP Proxy Server
 		*/
 		snprintf(tmp,sizeof(tmp)-1,"CONNECT %s:%i HTTP/1.1\r\n\r\n",RealHTTPHandle->GettargetDNS(),RealHTTPHandle->GetPort());
-		PHTTP_DATA request = new httpdata(tmp,strlen(tmp));
+		PHTTP_DATA request = new httpdata(tmp,(int)strlen(tmp));
 
 		if ( (RealHTTPHandle->GetlpProxyUserName()) && (RealHTTPHandle->GetlpProxyPassword())  )
 		{
@@ -655,41 +655,19 @@ PHTTP_DATA HTTPAPI::BuildHTTPRequest(
 /**************************************************************************************************/
 /**************************************************************************************************/
 /**************************************************************************************************/
-/*
-PREQUEST HTTPAPI::SendHttpRequestFinal(PHTTP_DATA request, PHTTP_DATA response,HTTPCSTR lpUsername,HTTPCSTR lpPassword,int AuthMethod)
+
+PREQUEST HTTPAPI::SendHttpRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request,HTTPCSTR lpUsername,HTTPCSTR lpPassword,int AuthMethod)
 {
-if (request) {
-
-}
-return(NULL);
-
-
-}
-*/
-/**************************************************************************************************/
-PREQUEST HTTPAPI::SendHttpRequest(
-								  HTTPHANDLE HTTPHandle,
-								  HTTPCSTR VHost,
-								  HTTPCSTR HTTPMethod,
-								  HTTPCSTR url,
-								  HTTPCSTR PostData,
-								  unsigned int PostDataSize,
-								  HTTPCSTR lpUsername,
-								  HTTPCSTR lpPassword,
-								  int AuthMethod)
-{
-
 
 	PHTTP_DATA 		response=NULL;
-	PHTTP_DATA 		request;
 	HTTPCHAR		tmp[MAX_HEADER_SIZE];
-
 	tmp[MAX_HEADER_SIZE-1]=0;	
+	char HTTPMethod[20];
+	char url[4096];
+	char *p,*q;
 
-	request=BuildHTTPRequest(HTTPHandle,VHost,HTTPMethod,url,PostData,PostDataSize);
-	if (!request)	return(NULL);
+
 	class HHANDLE *RealHTTPHandle=(class HHANDLE *)HTTPHandleTable[HTTPHandle];
-		
 	if ( (AuthMethod) && (lpUsername) && (lpPassword) )/* Deal with authentication */
 	{   
 		switch (AuthMethod)
@@ -698,15 +676,30 @@ PREQUEST HTTPAPI::SendHttpRequest(
 			BuildBasicAuthHeader("Authorization",lpUsername,lpPassword,tmp,MAX_HEADER_SIZE);
 			request->AddHeader(tmp);
 			break;
-		case DIGEST_AUTH:
-			HTTPSTR AuthenticationHeader;			
+		case DIGEST_AUTH:						
+			p=strchr(request->Header,' ');
+			if (p)
+			{
+				*p=0;
+				strncpy(HTTPMethod,request->Header,sizeof(HTTPMethod)-1);
+				HTTPMethod[sizeof(HTTPMethod)-1]=0;
+				*p=' '; p++;
+				q=strchr(p,' ');
+				if (q)
+				{
+					*q=0;
+					strncpy(url,p,sizeof(url)-1);
+					url[sizeof(url)-1]=0;
+					*q=' ';
+				}
+			}
 			if ( (!RealHTTPHandle->GetLastRequestedUri()) || (strcmp(RealHTTPHandle->GetLastRequestedUri(),url)!=0) && (RealHTTPHandle->GetLastAuthenticationString()==NULL) )
 			{   /*Send another request to check if authentication is required to get the www-authenticate header */
 				/* We cant reuse RealHTTPHandle->LastAuthenticationString now*/
 				response=DispatchHTTPRequest(HTTPHandle,request);				
 				if (!response)
 				{
-					delete request; return(NULL);
+					return(NULL);
 				} else 
 				{
 					RealHTTPHandle->SetLastRequestedUri(url);
@@ -720,6 +713,7 @@ PREQUEST HTTPAPI::SendHttpRequest(
 					}
 				}
 			}
+			HTTPSTR AuthenticationHeader;
 			if (AuthenticationHeader=CreateDigestAuth(RealHTTPHandle->GetLastAuthenticationString(),lpUsername,lpPassword,HTTPMethod,url,0))
 			{
 				request->AddHeader(AuthenticationHeader);
@@ -747,7 +741,6 @@ PREQUEST HTTPAPI::SendHttpRequest(
 			RealHTTPHandle->SetLastRequestedUri(url);
 			if (!response)
 			{ /* NTLM Negotiation failed */
-				delete request;
 				return(NULL);
 			}
 			if (( response->HeaderSize>=12) &&(memcmp(response->Header+9,"401",3)==0))
@@ -777,7 +770,6 @@ PREQUEST HTTPAPI::SendHttpRequest(
     }
 	if (!response)
 	{
-		delete request;
 		RealHTTPHandle->SetLastRequestedUri(NULL);
 		return(NULL);
 	}
@@ -788,30 +780,31 @@ PREQUEST HTTPAPI::SendHttpRequest(
 	     (!((class ConnectionHandling*)RealHTTPHandle->GetConnection())->IsSSLInitialized())  ) ) )
 	{
 		RealHTTPHandle->SetLastRequestedUri(NULL);
-		if (( response->HeaderSize>=12) && (memcmp(response->Header+9,"200",3)!=0))
+		if (( response->HeaderSize>=12) && (memcmp(response->Header+9,"200",3)==0))
 		{
+			/* Send the real http request thought stablished proxy connection */
+			return SendHttpRequest(HTTPHandle,request,lpUsername,lpPassword,AuthMethod);
+		} else 
+		{
+			/* Return a proxy error message */
 			if ( (RealHTTPHandle->GetConnection()) && (((class ConnectionHandling*)RealHTTPHandle->GetConnection())->IsSSLInitialized()) )
 			{
 				((class ConnectionHandling*)RealHTTPHandle->GetConnection())->FreeConnection();
 				RealHTTPHandle->SetConnection(NULL);
-			}
+			}		
 			return((PREQUEST)RealHTTPHandle->ParseReturnedBuffer(request, response));
-		} else
-		{
-			return SendHttpRequest(HTTPHandle,VHost,HTTPMethod,url,PostData,PostDataSize,lpUsername,lpPassword,AuthMethod);
-		}
+		} 
 	}
-
-
 
 	RealHTTPHandle->SetLastRequestedUri(url);
 	PREQUEST DATA=(PREQUEST)RealHTTPHandle->ParseReturnedBuffer(request, response);
 
 	if ( (DATA) && (DATA->challenge) && (DATA->status==401) && (!AuthMethod) && (lpUsername) && (lpPassword)  )
 	{   /* Send Authentication request and return the "authenticated" response */
-		PREQUEST AUTHDATA=SendHttpRequest(HTTPHandle,VHost,HTTPMethod,url,PostData,PostDataSize,lpUsername,lpPassword,DATA->challenge);
+		PREQUEST AUTHDATA=SendHttpRequest(HTTPHandle,request,lpUsername,lpPassword,DATA->challenge);
 		if (AUTHDATA)
 		{
+			DATA->request = NULL; /* We are reutilizing the same request, so avoid deleting memory twice */
 			delete DATA;
 			return(AUTHDATA);
 		}
@@ -827,22 +820,52 @@ PREQUEST HTTPAPI::SendHttpRequest(
 	if ( (RealHTTPHandle->IsAutoRedirectEnabled()) && ISREDIRECT(DATA->status) && (RealHTTPHandle->GetMaximumRedirects()) )
 	{
 		RealHTTPHandle->DecrementMaximumRedirectsCount();
-		char *Location = GetPathFromLocationHeader(DATA->response,RealHTTPHandle->IsSSLNeeded(),VHost ? VHost : RealHTTPHandle->GettargetDNS());
+		char *host = response->GetHeaderValue("Host:",0);
+		char *Location = GetPathFromLocationHeader(DATA->response,RealHTTPHandle->IsSSLNeeded(),host);
+		free(host);
 
 		if (Location)
 		{
-			PREQUEST RedirectedData = SendHttpRequest(HTTPHandle,VHost,"GET",Location,NULL,0,lpUsername,lpPassword,DATA->challenge);
+			PREQUEST RedirectedData = SendHttpRequest(HTTPHandle,NULL,"GET",Location,NULL,0,lpUsername,lpPassword,DATA->challenge);
 			if (RedirectedData)
 			{
 				free(Location);
+				DATA->request=NULL; /* We are reutilizing the same request, so avoid deleting memory twice */
 				delete DATA;
 				return (RedirectedData);
 			}
 		}
 	}
 	RealHTTPHandle->ResetMaximumRedirects();
+	return (DATA);
 
-	return(DATA);
+
+}
+/**************************************************************************************************/
+PREQUEST HTTPAPI::SendHttpRequest(
+								  HTTPHANDLE HTTPHandle,
+								  HTTPCSTR VHost,
+								  HTTPCSTR HTTPMethod,
+								  HTTPCSTR url,
+								  HTTPCSTR PostData,
+								  unsigned int PostDataSize,
+								  HTTPCSTR lpUsername,
+								  HTTPCSTR lpPassword,
+								  int AuthMethod)
+{
+
+	PHTTP_DATA request=BuildHTTPRequest(HTTPHandle,VHost,HTTPMethod,url,PostData,PostDataSize);
+	if (request)
+	{
+		PREQUEST DATA = SendHttpRequest(HTTPHandle,request,lpUsername,lpPassword,AuthMethod);
+		if (DATA)
+		{
+			return(DATA);
+		}
+		delete request;
+	}
+	return(NULL);
+
 }
 /*******************************************************************************************/
 char* HTTPAPI::GetPathFromLocationHeader(PHTTP_DATA response, int ssl, const char* domain)
@@ -1012,17 +1035,10 @@ void HTTPAPI::BuildBasicAuthHeader(HTTPCSTR Header,HTTPCSTR lpUsername, HTTPCSTR
 
 
 /*******************************************************************************************/
-PREQUEST HTTPAPI::SendRawHTTPRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request)
+PREQUEST HTTPAPI::SendHttpRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request)
 {
 	PHTTP_DATA newrequest= new httpdata (request->Header,request->HeaderSize,request->Data, request->DataSize);
-	/* we need to allocate the request again as the "request" will be included as a pointer into the PREQUEST struct */
-	PHTTP_DATA		response = DispatchHTTPRequest(HTTPHandle,newrequest);
-	if (!response)
-	{
-		delete newrequest;
-		return(NULL);
-	}
-	return ( (PREQUEST) HTTPHandleTable[HTTPHandle]->ParseReturnedBuffer( newrequest,response) ); //manually parse the request buffer to extract URI
+	return SendHttpRequest(HTTPHandle,newrequest,NULL,NULL,NO_AUTH);
 }
 /*******************************************************************************************/
 PREQUEST HTTPAPI::SendRawHTTPRequest(HTTPHANDLE HTTPHandle,HTTPCSTR headers, unsigned int HeaderSize, HTTPCSTR postdata, unsigned int PostDataSize)
