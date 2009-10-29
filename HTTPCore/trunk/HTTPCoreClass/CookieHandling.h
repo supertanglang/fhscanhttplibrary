@@ -105,7 +105,7 @@ class CookieStatus
 
 public:
 	CookieStatus();
-	BOOL ExtractDate(char *lpdate, time_t *expires);
+	time_t ExtractDate(char *lpdate);
 	int ParseCookieData(char *lpCookieData, const char *lpPath, const char *lpDomain);
 	char *ReturnCookieHeaderFor(const char *lpDomain,const char *path,int CookieOverSSL);
 

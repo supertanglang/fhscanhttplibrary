@@ -64,7 +64,7 @@ prequest::~prequest()
 	if (server)			free(server);
 	if (ContentType)	free(ContentType);
 	if (url)			free(url);
-	if (Parameters)			free(Parameters);
+	if (Parameters)		free(Parameters);
 }
 
 /*******************************************************************************************************/
@@ -534,52 +534,30 @@ PHTTP_DATA HTTPAPI::BuildHTTPRequest(
 	}
 
 	class HHANDLE *RealHTTPHandle=(class HHANDLE *)HTTPHandleTable[HTTPHandle];
-	HTTPCHAR		tmp[MAX_HEADER_SIZE];	
-	string 			rb;
+	HTTPCHAR		tmp[MAX_HEADER_SIZE];
 	tmp[MAX_HEADER_SIZE-1]=0;
-#ifdef _OPENSSL_SUPPORT_
 
-	ERROR - AAAAAAA TODO!!
-	if ( (RealHTTPHandle->ProxyEnabled()) &&
-		(RealHTTPHandle->IsSSLNeeded()) &&
-		( (!RealHTTPHandle->GetConnection()) ||
+	if ( (RealHTTPHandle->ProxyEnabled()) && (RealHTTPHandle->IsSSLNeeded()) &&
+       ( (!RealHTTPHandle->GetConnection()) ||
 		( (RealHTTPHandle->GetConnection())  &&
 		(!((class ConnectionHandling*)RealHTTPHandle->GetConnection())->IsSSLInitialized())  ) ) )
 	{
 		/*
 		* We have to deal with an HTTPS request thought a proxy server 
-		* Under this scenario we first need to send a previous non SSL request to the proxy
+		* Under this scenario we first need to send an initial non SSL request to the proxy
 		* We need to send a "CONNECT" verb to the HTTP Proxy Server
 		*/
-		snprintf(tmp,sizeof(tmp)-1,"CONNECT %s:%i HTTP/1.1\r\n",RealHTTPHandle->GettargetDNS(),RealHTTPHandle->GetPort());
-		rb = tmp;
+		snprintf(tmp,sizeof(tmp)-1,"CONNECT %s:%i HTTP/1.1\r\n\r\n",RealHTTPHandle->GettargetDNS(),RealHTTPHandle->GetPort());
+		PHTTP_DATA request = new httpdata(tmp,strlen(tmp));
 
 		if ( (RealHTTPHandle->GetlpProxyUserName()) && (RealHTTPHandle->GetlpProxyPassword())  )
 		{
 			BuildBasicAuthHeader("Proxy-Authorization",RealHTTPHandle->GetlpProxyUserName(),RealHTTPHandle->GetlpProxyPassword(),tmp,sizeof(tmp));
+			request->AddHeader(tmp);
 		}
-		rb+="\r\n";
-		PREQUEST ProxyAuth = SendRawHTTPRequest(HTTPHandle,rb.c_str(),rb.length(),NULL,0);
-		RealHTTPHandle->SetLastRequestedUri(NULL);
-		if (ProxyAuth)
-		{
-			if (ProxyAuth->status!=200)
-			{
-				if ( (RealHTTPHandle->GetConnection()) && (((class ConnectionHandling*)RealHTTPHandle->GetConnection())->IsSSLInitialized()) )
-				{
-					((class ConnectionHandling*)RealHTTPHandle->GetConnection())->FreeConnection();
-					RealHTTPHandle->SetConnection(NULL);
-				}
-				return(ProxyAuth);
-			}
-			delete ProxyAuth;
-		} else
-		{
-			return(NULL);
-		}
+		return(request);
 	}
-#endif
-	char *lpPath =  GetPathFromURL(url);
+
 	if ( (RealHTTPHandle->ProxyEnabled()) && (!RealHTTPHandle->IsSSLNeeded()) )
 	{
 		snprintf(tmp,MAX_HEADER_SIZE-1,"%s http://%s:%i%s HTTP/1.%i\r\n",HTTPMethod,RealHTTPHandle->GettargetDNS(),RealHTTPHandle->GetPort(),url,RealHTTPHandle->GetVersion());
@@ -593,7 +571,7 @@ PHTTP_DATA HTTPAPI::BuildHTTPRequest(
 			snprintf(tmp,MAX_HEADER_SIZE-1,"GET %s?%s HTTP/1.%i\r\n",url,PostData,RealHTTPHandle->GetVersion());
 		}
 	}
-	rb =tmp;
+	string rb = tmp;
 
 	/* Append the Host header */
 	if (VHost)
@@ -623,7 +601,9 @@ PHTTP_DATA HTTPAPI::BuildHTTPRequest(
 
 	if (RealHTTPHandle->IsCookieSupported())
 	{ /* Include Cookies stored into the internal COOKIE bTree */
+		char *lpPath = GetPathFromURL(url);
 		char *ServerCookie = BuildCookiesFromStoredData( RealHTTPHandle->GettargetDNS(),lpPath,RealHTTPHandle->IsSSLNeeded());
+		free(lpPath);
 		if (ServerCookie)
 		{
             rb+="Cookie: ";
@@ -675,7 +655,18 @@ PHTTP_DATA HTTPAPI::BuildHTTPRequest(
 /**************************************************************************************************/
 /**************************************************************************************************/
 /**************************************************************************************************/
+/*
+PREQUEST HTTPAPI::SendHttpRequestFinal(PHTTP_DATA request, PHTTP_DATA response,HTTPCSTR lpUsername,HTTPCSTR lpPassword,int AuthMethod)
+{
+if (request) {
 
+}
+return(NULL);
+
+
+}
+*/
+/**************************************************************************************************/
 PREQUEST HTTPAPI::SendHttpRequest(
 								  HTTPHANDLE HTTPHandle,
 								  HTTPCSTR VHost,
@@ -719,7 +710,7 @@ PREQUEST HTTPAPI::SendHttpRequest(
 				} else 
 				{
 					RealHTTPHandle->SetLastRequestedUri(url);
-					if (memcmp(response->Header+9,"401",3)!=0)
+					if (( response->HeaderSize>=12) && (memcmp(response->Header+9,"401",3)!=0) )
 					{   
 						break;
 					} else 
@@ -759,20 +750,18 @@ PREQUEST HTTPAPI::SendHttpRequest(
 				delete request;
 				return(NULL);
 			}
-			if (memcmp(response->Header+9,"401",3)==0)
+			if (( response->HeaderSize>=12) &&(memcmp(response->Header+9,"401",3)==0))
 			{   /*Parse NTLM Message Type 2 */
 				HTTPSTR NTLMresponse = response->GetHeaderValue("WWW-Authenticate: NTLM ",0);
-				if (!NTLMresponse)
-				{   /* WWW-Authenticate: NTLM Header not Found */
-					break;
-				}
+				if (!NTLMresponse)  break;  /* WWW-Authenticate: NTLM Header not Found */
 				from64tobits((HTTPSTR )&buf1[0], NTLMresponse); /* Build NTLM Message Type 3 */
 				buildAuthResponse((tSmbNtlmAuthChallenge*)buf1,(tSmbNtlmAuthResponse*)buf2,0,lpUsername,lpPassword,NULL,NULL);
 				to64frombits(buf1, buf2, (int)SmbLength((tSmbNtlmAuthResponse*)buf2));
 				snprintf(tmp,MAX_HEADER_SIZE-1,"Authorization: NTLM %s\r\n",buf1);
+                request->AddHeader(tmp);
 				free(NTLMresponse);
 				delete(response); response = NULL;
-				request->AddHeader(tmp);
+
 			} else
 			{   /* The server does not requiere NTLM authentication or weird anonymous authentication supported? (only NTLM type 1 sent)*/
 				break;
@@ -782,14 +771,39 @@ PREQUEST HTTPAPI::SendHttpRequest(
 	}
 
 	/* Authentication Headers - if needed - have been added */
-	if (!response)  
-		response=DispatchHTTPRequest(HTTPHandle,request);	
+	if (!response)
+	{
+		response=DispatchHTTPRequest(HTTPHandle,request);
+    }
 	if (!response)
 	{
 		delete request;
 		RealHTTPHandle->SetLastRequestedUri(NULL);
 		return(NULL);
 	}
+
+	if ( (RealHTTPHandle->ProxyEnabled()) && (RealHTTPHandle->IsSSLNeeded()) &&
+	   ( (!RealHTTPHandle->GetConnection()) ||
+	   ( (RealHTTPHandle->GetConnection())  &&
+	     (!((class ConnectionHandling*)RealHTTPHandle->GetConnection())->IsSSLInitialized())  ) ) )
+	{
+		RealHTTPHandle->SetLastRequestedUri(NULL);
+		if (( response->HeaderSize>=12) && (memcmp(response->Header+9,"200",3)!=0))
+		{
+			if ( (RealHTTPHandle->GetConnection()) && (((class ConnectionHandling*)RealHTTPHandle->GetConnection())->IsSSLInitialized()) )
+			{
+				((class ConnectionHandling*)RealHTTPHandle->GetConnection())->FreeConnection();
+				RealHTTPHandle->SetConnection(NULL);
+			}
+			return((PREQUEST)RealHTTPHandle->ParseReturnedBuffer(request, response));
+		} else
+		{
+			return SendHttpRequest(HTTPHandle,VHost,HTTPMethod,url,PostData,PostDataSize,lpUsername,lpPassword,AuthMethod);
+		}
+	}
+
+
+
 	RealHTTPHandle->SetLastRequestedUri(url);
 	PREQUEST DATA=(PREQUEST)RealHTTPHandle->ParseReturnedBuffer(request, response);
 
@@ -810,20 +824,23 @@ PREQUEST HTTPAPI::SendHttpRequest(
 	}
 
 	#define ISREDIRECT(a) ((a==HTTP_STATUS_MOVED) || (a ==HTTP_STATUS_REDIRECT) || (a==HTTP_STATUS_REDIRECT_METHOD) )
-	if ( (RealHTTPHandle->IsAutoRedirectEnabled()) && ISREDIRECT(DATA->status) )
+	if ( (RealHTTPHandle->IsAutoRedirectEnabled()) && ISREDIRECT(DATA->status) && (RealHTTPHandle->GetMaximumRedirects()) )
 	{
+		RealHTTPHandle->DecrementMaximumRedirectsCount();
 		char *Location = GetPathFromLocationHeader(DATA->response,RealHTTPHandle->IsSSLNeeded(),VHost ? VHost : RealHTTPHandle->GettargetDNS());
+
 		if (Location)
 		{
-			PREQUEST RedirectedData = SendHttpRequest(HTTPHandle,VHost,"GET",Location,PostData,PostDataSize,lpUsername,lpPassword,DATA->challenge);
+			PREQUEST RedirectedData = SendHttpRequest(HTTPHandle,VHost,"GET",Location,NULL,0,lpUsername,lpPassword,DATA->challenge);
 			if (RedirectedData)
 			{
 				free(Location);
 				delete DATA;
 				return (RedirectedData);
 			}
-		} 
+		}
 	}
+	RealHTTPHandle->ResetMaximumRedirects();
 
 	return(DATA);
 }
@@ -985,7 +1002,7 @@ void HTTPAPI::BuildBasicAuthHeader(HTTPCSTR Header,HTTPCSTR lpUsername, HTTPCSTR
 	char RawUserPass[750];
 	char EncodedUserPass[1000];
 
-	RawUserPass[749]='\0';
+	RawUserPass[sizeof(RawUserPass)-1]='\0';
 	snprintf(RawUserPass,sizeof(RawUserPass)-1,"%s:%s",lpUsername,lpPassword);
 	int ret = Base64Encode((unsigned HTTPSTR )EncodedUserPass,(unsigned HTTPSTR)RawUserPass,(int)strlen(RawUserPass));	
 	EncodedUserPass[ret]='\0';

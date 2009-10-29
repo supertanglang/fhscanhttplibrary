@@ -16,7 +16,6 @@
 #define OPT_HTTP_PROXY_PORT		0x01
 #define OPT_HTTP_PROXY_USER		0x02
 #define OPT_HTTP_PROXY_PASS		0x04
-
 #define OPT_HTTP_HEADER			0x08
 #define OPT_HTTP_COOKIE			0x10
 #define OPT_HTTP_USERAGENT		0x20
@@ -252,6 +251,7 @@ public:
 	HTTPSTR		GetHTTPConfig(HTTPHANDLE HTTPHandle,int opt);
 	int			EndHTTPConnectionHandle(HTTPHANDLE);
 
+	PHTTP_DATA  BuildHTTPRequest(HTTPHANDLE HTTPHandle,HTTPCSTR VHost,HTTPCSTR HTTPMethod,HTTPCSTR url,HTTPCSTR Postdata,unsigned int PostDataSize);
 	PREQUEST	SendRawHTTPRequest(HTTPHANDLE HTTPHandle,HTTPCSTR headers, unsigned int HeaderSize, HTTPCSTR postdata, unsigned int PostDataSize);
 	PREQUEST	SendRawHTTPRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request);
 	PREQUEST	SendHttpRequest(HTTPHANDLE HTTPHandle,HTTPCSTR VHost,HTTPCSTR HTTPMethod,HTTPCSTR url,HTTPCSTR Postdata,unsigned int PostDataSize,HTTPCSTR lpUsername,HTTPCSTR lpPassword,int AuthMethod);
