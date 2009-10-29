@@ -462,7 +462,8 @@ void *HHANDLE::ParseReturnedBuffer(struct httpdata *request, struct httpdata *re
 			char *method = strchr(url,' ');		if (method) *method = 0;
 			char *parameters= strchr(url,';');  if (parameters) *parameters = 0;
 			parameters= strchr(url,'?');   		if (!parameters) parameters= strchr(url,'&');
-			if (parameters) {
+			if (parameters) 
+			{
 				*parameters = 0;
 				data->Parameters= strdup(parameters+1);
 			}

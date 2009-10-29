@@ -253,11 +253,13 @@ public:
 
 	PHTTP_DATA  BuildHTTPRequest(HTTPHANDLE HTTPHandle,HTTPCSTR VHost,HTTPCSTR HTTPMethod,HTTPCSTR url,HTTPCSTR Postdata,unsigned int PostDataSize);
 	PREQUEST	SendRawHTTPRequest(HTTPHANDLE HTTPHandle,HTTPCSTR headers, unsigned int HeaderSize, HTTPCSTR postdata, unsigned int PostDataSize);
-	PREQUEST	SendRawHTTPRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request);
+	PREQUEST	SendHttpRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request);
+	
 	PREQUEST	SendHttpRequest(HTTPHANDLE HTTPHandle,HTTPCSTR VHost,HTTPCSTR HTTPMethod,HTTPCSTR url,HTTPCSTR Postdata,unsigned int PostDataSize,HTTPCSTR lpUsername,HTTPCSTR lpPassword,int AuthMethod);
 	PREQUEST	SendHttpRequest(HTTPHANDLE HTTPHandle,HTTPCSTR VHost,HTTPCSTR HTTPMethod,HTTPCSTR url,HTTPCSTR Postdata,unsigned int PostDataSize);
 	PREQUEST	SendHttpRequest(HTTPHANDLE HTTPHandle,HTTPCSTR HTTPMethod,HTTPCSTR url,HTTPCSTR Postdata,unsigned int PostDataSize);
 	PREQUEST	SendHttpRequest(HTTPHANDLE HTTPHandle,HTTPCSTR VHost,HTTPCSTR HTTPMethod,HTTPCSTR url) ;
+	PREQUEST    SendHttpRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request,HTTPCSTR lpUsername,HTTPCSTR lpPassword,int AuthMethod);
 	PREQUEST	SendHttpRequest(HTTPHANDLE HTTPHandle,HTTPCSTR HTTPMethod,HTTPCSTR url) ;
 	PREQUEST	SendHttpRequest(HTTPHANDLE HTTPHandle,HTTPCSTR url) ;
 	PREQUEST	SendHttpRequest(HTTPCSTR Fullurl);
