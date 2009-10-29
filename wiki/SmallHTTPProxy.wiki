@@ -40,12 +40,12 @@ int CBLog(int cbType,HTTPAPI *api, HTTPHANDLE HTTPHandle, PHTTP_DATA  request, P
 {
  if ( (request) && (response))
  {
-   char *data  = request->GetRequestedURL(); /* Extract the request url */
+   char *url   = request->GetRequestedURL(); /* Extract the request url */
    char status = response->GetStatus();    /* Get the returned HTTP response code */
    char *method= request->GetHTTPMethod(); /* Extract the HTTP verb (HEAD, GET, POST, ..) */
    if (method)
    {
-     printf("%-6s %-40s %.4s %3.3i %5.i %s\n",method,api->GetHTTPConfig(HTTPHandle,OPT_HTTP_HOST),api->GetHTTPConfig(HTTPHandle,OPT_HTTP_PORT),status,response->DataSize, data);
+     printf("%-6s %-40s %.4s %3.3i %5.i %s\n",method,api->GetHTTPConfig(HTTPHandle,OPT_HTTP_HOST),api->GetHTTPConfig(HTTPHandle,OPT_HTTP_PORT),status,response->DataSize, url);
      free(method);
    }
    free(data);
