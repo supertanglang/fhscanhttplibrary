@@ -54,3 +54,5 @@ int CBLog(int cbType,HTTPAPI *api, HTTPHANDLE HTTPHandle, PHTTP_DATA  request, P
 }
 
 }}}
+
+Of course you can also modify the data (request and response) or block the request or response by using a return value other than CBRET_STATUS_NEXT_CB_CONTINUE.
