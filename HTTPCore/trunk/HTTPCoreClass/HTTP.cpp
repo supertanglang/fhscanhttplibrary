@@ -520,32 +520,26 @@ PHTTP_DATA HTTPAPI::DispatchHTTPRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request
 }
 
 /*******************************************************************************************************/
-
-PREQUEST HTTPAPI::SendHttpRequest(
+PHTTP_DATA HTTPAPI::BuildHTTPRequest(
 								  HTTPHANDLE HTTPHandle,
 								  HTTPCSTR VHost,
 								  HTTPCSTR HTTPMethod,
 								  HTTPCSTR url,
-								  HTTPCSTR Postdata,
-								  unsigned int PostDataSize,
-								  HTTPCSTR lpUsername,
-								  HTTPCSTR lpPassword,
-								  int AuthMethod)
+								  HTTPCSTR PostData,
+								  unsigned int PostDataSize)
 {
-
 	if ( (!url) || (*url!='/') )
 	{
 		return ( NULL);
 	}
 
 	class HHANDLE *RealHTTPHandle=(class HHANDLE *)HTTPHandleTable[HTTPHandle];
-	PHTTP_DATA 		request=NULL, response=NULL;
-	HTTPCHAR		tmp[MAX_HEADER_SIZE];
-	PREQUEST 		DATA;
-	string 			rb, tmprb;
+	HTTPCHAR		tmp[MAX_HEADER_SIZE];	
+	string 			rb;
 	tmp[MAX_HEADER_SIZE-1]=0;
-
 #ifdef _OPENSSL_SUPPORT_
+
+	ERROR - AAAAAAA TODO!!
 	if ( (RealHTTPHandle->ProxyEnabled()) &&
 		(RealHTTPHandle->IsSSLNeeded()) &&
 		( (!RealHTTPHandle->GetConnection()) ||
@@ -586,7 +580,6 @@ PREQUEST HTTPAPI::SendHttpRequest(
 	}
 #endif
 	char *lpPath =  GetPathFromURL(url);
-
 	if ( (RealHTTPHandle->ProxyEnabled()) && (!RealHTTPHandle->IsSSLNeeded()) )
 	{
 		snprintf(tmp,MAX_HEADER_SIZE-1,"%s http://%s:%i%s HTTP/1.%i\r\n",HTTPMethod,RealHTTPHandle->GettargetDNS(),RealHTTPHandle->GetPort(),url,RealHTTPHandle->GetVersion());
@@ -597,7 +590,7 @@ PREQUEST HTTPAPI::SendHttpRequest(
 			snprintf(tmp,MAX_HEADER_SIZE-1,"%s %s HTTP/1.%i\r\n",HTTPMethod,url,RealHTTPHandle->GetVersion());
 		} else
 		{
-			snprintf(tmp,MAX_HEADER_SIZE-1,"GET %s?%s HTTP/1.%i\r\n",url,Postdata,RealHTTPHandle->GetVersion());
+			snprintf(tmp,MAX_HEADER_SIZE-1,"GET %s?%s HTTP/1.%i\r\n",url,PostData,RealHTTPHandle->GetVersion());
 		}
 	}
 	rb =tmp;
@@ -673,67 +666,75 @@ PREQUEST HTTPAPI::SendHttpRequest(
 		}
 		rb+=tmp;
 	}
+	rb+="\r\n";
 
-	if ( (AuthMethod) && (lpUsername) && (lpPassword) )
-	{   /* Deal with authentication */
-		PREQUEST tmpdata=NULL;
+	return (new httpdata(rb.c_str(),(unsigned int)rb.length(),PostData,PostDataSize) );
+}
+
+
+/**************************************************************************************************/
+/**************************************************************************************************/
+/**************************************************************************************************/
+
+PREQUEST HTTPAPI::SendHttpRequest(
+								  HTTPHANDLE HTTPHandle,
+								  HTTPCSTR VHost,
+								  HTTPCSTR HTTPMethod,
+								  HTTPCSTR url,
+								  HTTPCSTR PostData,
+								  unsigned int PostDataSize,
+								  HTTPCSTR lpUsername,
+								  HTTPCSTR lpPassword,
+								  int AuthMethod)
+{
+
+
+	PHTTP_DATA 		response=NULL;
+	PHTTP_DATA 		request;
+	HTTPCHAR		tmp[MAX_HEADER_SIZE];
+
+	tmp[MAX_HEADER_SIZE-1]=0;	
+
+	request=BuildHTTPRequest(HTTPHandle,VHost,HTTPMethod,url,PostData,PostDataSize);
+	if (!request)	return(NULL);
+	class HHANDLE *RealHTTPHandle=(class HHANDLE *)HTTPHandleTable[HTTPHandle];
+		
+	if ( (AuthMethod) && (lpUsername) && (lpPassword) )/* Deal with authentication */
+	{   
 		switch (AuthMethod)
 		{
 		case BASIC_AUTH:
 			BuildBasicAuthHeader("Authorization",lpUsername,lpPassword,tmp,MAX_HEADER_SIZE);
-			rb+=tmp;
+			request->AddHeader(tmp);
 			break;
 		case DIGEST_AUTH:
-			HTTPSTR AuthenticationHeader;
-			/*Search for cached nonces store in previous calls. */
-			if ( (RealHTTPHandle->GetLastRequestedUri()) && (strcmp(RealHTTPHandle->GetLastRequestedUri(),url)==0) && (RealHTTPHandle->GetLastAuthenticationString()!=NULL) )
-			{   /* Reusing realm: RealHTTPHandle->LastAuthenticationString */
-			} else
-			{   /*Send another request to check if authentication is required and get www-authenticate header */
-				tmprb = rb + "\r\n";
-				if  (  (strncmp(HTTPMethod,"GET",3)!=0) && (PostDataSize) )
-				{
-					request = new httpdata(tmprb.c_str(),tmprb.length(), (HTTPSTR)Postdata,PostDataSize );
-				} else
-				{
-					request = new httpdata(tmprb.c_str(),tmprb.length());
-				}
-
-				response=DispatchHTTPRequest(HTTPHandle,request);
-				RealHTTPHandle->SetLastRequestedUri(url);
+			HTTPSTR AuthenticationHeader;			
+			if ( (!RealHTTPHandle->GetLastRequestedUri()) || (strcmp(RealHTTPHandle->GetLastRequestedUri(),url)!=0) && (RealHTTPHandle->GetLastAuthenticationString()==NULL) )
+			{   /*Send another request to check if authentication is required to get the www-authenticate header */
+				/* We cant reuse RealHTTPHandle->LastAuthenticationString now*/
+				response=DispatchHTTPRequest(HTTPHandle,request);				
 				if (!response)
 				{
-					delete request;
-					free(lpPath);
-					return(NULL);
-				}
-				tmpdata=(PREQUEST)RealHTTPHandle->ParseReturnedBuffer(request,response);
-
-				if (tmpdata->status!=401)
+					delete request; return(NULL);
+				} else 
 				{
-					if (RealHTTPHandle->IsCookieSupported())
+					RealHTTPHandle->SetLastRequestedUri(url);
+					if (memcmp(response->Header+9,"401",3)!=0)
+					{   
+						break;
+					} else 
 					{
-						ExtractCookiesFromResponseData(tmpdata->response, lpPath,RealHTTPHandle->GettargetDNS());
+						RealHTTPHandle->SetLastAuthenticationString(response->GetHeaderValue("WWW-Authenticate: Digest ",0));
+						delete response; response = NULL;
 					}
-					free(lpPath);
-					return(tmpdata);
 				}
-				//RealHTTPHandle->SetLastAuthenticationString(response->GetHeaderValue("WWW-Authenticate: Digest ",0));
-				delete tmpdata;
 			}
-
-
-			AuthenticationHeader=CreateDigestAuth(RealHTTPHandle->GetLastAuthenticationString(),lpUsername,lpPassword,HTTPMethod,url,0);
-			if (AuthenticationHeader)
+			if (AuthenticationHeader=CreateDigestAuth(RealHTTPHandle->GetLastAuthenticationString(),lpUsername,lpPassword,HTTPMethod,url,0))
 			{
-				rb+=AuthenticationHeader;
+				request->AddHeader(AuthenticationHeader);
 				free(AuthenticationHeader);
 			} else
 			{
-#ifdef _DBG_
-				sprintf(tmp,"AUTH DIGEST FAILED Host %s - path: %s, DATA:%s\n",RealHTTPHandle->targetDNS,url,RealHTTPHandle->LastAuthenticationString);
-				printf("%s\n",tmp);
-#endif
 				RealHTTPHandle->SetLastAuthenticationString(NULL);
 			}
 			break;
@@ -742,133 +743,87 @@ PREQUEST HTTPAPI::SendHttpRequest(
 		case NEGOTIATE_AUTH:
 			unsigned char buf2[4096];
 			unsigned char buf1[4096];
-
 			memset(buf1,'\0',sizeof(buf1));
 			memset(buf2,'\0',sizeof(buf2));
 
 			BuildAuthRequest((tSmbNtlmAuthRequest*)buf2,0,NULL,NULL);
 			to64frombits(buf1, buf2, (int)SmbLength((tSmbNtlmAuthResponse*)buf2));
 			snprintf(tmp,MAX_HEADER_SIZE-1,"Authorization: NTLM %s\r\n",buf1);
-			tmprb = rb + tmp;
+			request->AddHeader(tmp);
 
-			if  (  (strncmp(HTTPMethod,"GET",3)!=0) && (PostDataSize) ) /* Add optional POST HEADER */
-			{				
-				request= new httpdata (tmprb.c_str(),tmprb.length(),(HTTPSTR)Postdata,PostDataSize);
-			} else
-			{
-				request=new httpdata (tmprb.c_str(),tmprb.length());
-			}
 			response=DispatchHTTPRequest(HTTPHandle,request);
+			request->RemoveHeader("Authorization:");
 			RealHTTPHandle->SetLastRequestedUri(url);
 			if (!response)
-			{
+			{ /* NTLM Negotiation failed */
 				delete request;
-				free(lpPath);
 				return(NULL);
 			}
-			tmpdata=(PREQUEST)RealHTTPHandle->ParseReturnedBuffer(  request,response);
-
-			if (!tmpdata)
-			{ 	/* At this point, both request and response should be NULL, so no need to free them */
-				free(lpPath);
-				return(NULL);
-			}
-
-			if (tmpdata->status==401)
+			if (memcmp(response->Header+9,"401",3)==0)
 			{   /*Parse NTLM Message Type 2 */
-				HTTPSTR response=tmpdata->response->GetHeaderValue("WWW-Authenticate: NTLM ",0);
-				if (!response)
+				HTTPSTR NTLMresponse = response->GetHeaderValue("WWW-Authenticate: NTLM ",0);
+				if (!NTLMresponse)
 				{   /* WWW-Authenticate: NTLM Header not Found */
-					tmpdata->url=strdup(url);
-					if (RealHTTPHandle->IsCookieSupported())
-					{
-						ExtractCookiesFromResponseData(tmpdata->response, lpPath,RealHTTPHandle->GettargetDNS());
-					}
-					free(lpPath);
-					return(tmpdata);
+					break;
 				}
-				from64tobits((HTTPSTR )&buf1[0], response); /* Build NTLM Message Type 3 */
+				from64tobits((HTTPSTR )&buf1[0], NTLMresponse); /* Build NTLM Message Type 3 */
 				buildAuthResponse((tSmbNtlmAuthChallenge*)buf1,(tSmbNtlmAuthResponse*)buf2,0,lpUsername,lpPassword,NULL,NULL);
 				to64frombits(buf1, buf2, (int)SmbLength((tSmbNtlmAuthResponse*)buf2));
 				snprintf(tmp,MAX_HEADER_SIZE-1,"Authorization: NTLM %s\r\n",buf1);
-				free(response);
-				delete tmpdata;
+				free(NTLMresponse);
+				delete(response); response = NULL;
+				request->AddHeader(tmp);
 			} else
 			{   /* The server does not requiere NTLM authentication or weird anonymous authentication supported? (only NTLM type 1 sent)*/
-				if (RealHTTPHandle->IsCookieSupported())
-				{
-					ExtractCookiesFromResponseData(tmpdata->response, lpPath,RealHTTPHandle->GettargetDNS());
-				}
-				free(lpPath);
-				return(tmpdata);
+				break;
 			}
-			rb+=tmp;
 			break;
 		}
 	}
-	rb+="\r\n";
 
-	request= new httpdata (rb.c_str(),rb.length(),NULL,0);
-
-	if  (  (strncmp(HTTPMethod,"GET",3)!=0) && (Postdata) )
-	{   /*Include Optional Post Data */
-		free(request->Data);
-		request->Data = (HTTPSTR)malloc(PostDataSize +1);
-		memcpy(request->Data,Postdata,PostDataSize);
-		request->Data[PostDataSize]='\0';
-		request->DataSize = PostDataSize;
-	}
-	response=DispatchHTTPRequest(HTTPHandle,request);
-	RealHTTPHandle->SetLastRequestedUri(url);
+	/* Authentication Headers - if needed - have been added */
+	if (!response)  
+		response=DispatchHTTPRequest(HTTPHandle,request);	
 	if (!response)
 	{
 		delete request;
-		free(lpPath);
+		RealHTTPHandle->SetLastRequestedUri(NULL);
 		return(NULL);
 	}
-	DATA=(PREQUEST)RealHTTPHandle->ParseReturnedBuffer(request, response);
+	RealHTTPHandle->SetLastRequestedUri(url);
+	PREQUEST DATA=(PREQUEST)RealHTTPHandle->ParseReturnedBuffer(request, response);
 
-	if ( (DATA) && (DATA->challenge) && (!AuthMethod) && (lpUsername) && (lpPassword) )
+	if ( (DATA) && (DATA->challenge) && (DATA->status==401) && (!AuthMethod) && (lpUsername) && (lpPassword)  )
 	{   /* Send Authentication request and return the "authenticated" response */
-		if (RealHTTPHandle->IsCookieSupported())
-		{
-			ExtractCookiesFromResponseData(DATA->response, lpPath,RealHTTPHandle->GettargetDNS());
-		}
-		PREQUEST AUTHDATA=SendHttpRequest(HTTPHandle,VHost,HTTPMethod,url,Postdata,PostDataSize,lpUsername,lpPassword,DATA->challenge);
+		PREQUEST AUTHDATA=SendHttpRequest(HTTPHandle,VHost,HTTPMethod,url,PostData,PostDataSize,lpUsername,lpPassword,DATA->challenge);
 		if (AUTHDATA)
 		{
 			delete DATA;
-			free(lpPath);
 			return(AUTHDATA);
 		}
 	}
-
 	if (RealHTTPHandle->IsCookieSupported())
 	{
-		ExtractCookiesFromResponseData(DATA->response, lpPath,RealHTTPHandle->GettargetDNS());
+		char *lpPath =  GetPathFromURL(url);
+		ExtractCookiesFromResponseData(response, lpPath,RealHTTPHandle->GettargetDNS());
+		free(lpPath);
 	}
-	free(lpPath);
+
 	#define ISREDIRECT(a) ((a==HTTP_STATUS_MOVED) || (a ==HTTP_STATUS_REDIRECT) || (a==HTTP_STATUS_REDIRECT_METHOD) )
 	if ( (RealHTTPHandle->IsAutoRedirectEnabled()) && ISREDIRECT(DATA->status) )
 	{
 		char *Location = GetPathFromLocationHeader(DATA->response,RealHTTPHandle->IsSSLNeeded(),VHost ? VHost : RealHTTPHandle->GettargetDNS());
 		if (Location)
 		{
-        	//printf("Redirigimos a %s\n",Location);
-			PREQUEST RedirectedData = SendHttpRequest(HTTPHandle,VHost,"GET",Location,Postdata,PostDataSize,lpUsername,lpPassword,DATA->challenge);
-
+			PREQUEST RedirectedData = SendHttpRequest(HTTPHandle,VHost,"GET",Location,PostData,PostDataSize,lpUsername,lpPassword,DATA->challenge);
 			if (RedirectedData)
 			{
 				free(Location);
 				delete DATA;
 				return (RedirectedData);
 			}
-		} else
-		{
-            printf("* REDIRECCION NO ENCONTRADA O APUNTA A OTRO DOMAIN\n");
-        }
+		} 
 	}
-
 
 	return(DATA);
 }

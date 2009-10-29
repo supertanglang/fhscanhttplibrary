@@ -468,7 +468,7 @@ void *HHANDLE::ParseReturnedBuffer(struct httpdata *request, struct httpdata *re
 		free(line);
 	}
 
-	SetLastAuthenticationString(response->GetHeaderValue("WWW-Authenticate: Digest ",0));
+	
 
 	return(data);
 
