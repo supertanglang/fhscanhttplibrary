@@ -820,7 +820,7 @@ PREQUEST HTTPAPI::SendHttpRequest(HTTPHANDLE HTTPHandle,PHTTP_DATA request,HTTPC
 	if ( (RealHTTPHandle->IsAutoRedirectEnabled()) && ISREDIRECT(DATA->status) && (RealHTTPHandle->GetMaximumRedirects()) )
 	{
 		RealHTTPHandle->DecrementMaximumRedirectsCount();
-		char *host = response->GetHeaderValue("Host:",0);
+		char *host = request->GetHeaderValue("Host:",0);
 		char *Location = GetPathFromLocationHeader(DATA->response,RealHTTPHandle->IsSSLNeeded(),host);
 		free(host);
 
@@ -870,6 +870,9 @@ PREQUEST HTTPAPI::SendHttpRequest(
 /*******************************************************************************************/
 char* HTTPAPI::GetPathFromLocationHeader(PHTTP_DATA response, int ssl, const char* domain)
 {
+	if (!domain) {
+        return(NULL);
+	}
 	char *Location = response->GetHeaderValue("Location:",0);
 	if (Location)
 	{
