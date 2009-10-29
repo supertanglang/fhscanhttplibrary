@@ -60,6 +60,7 @@ HHANDLE::HHANDLE(void)
 	#endif
 	CookieSupported  = 1; /* Enabled by default */
 	AutoRedirect	 = 1;
+	MaximumRedirects = MAXIMUM_HTTP_REDIRECT_DEEP;
 
 }
 /*******************************************************************************************************/
@@ -105,6 +106,7 @@ int HHANDLE::InitHandle(HTTPSTR hostname,int HTTPPort,int ssl)
 	memset(lpTmpData,0,sizeof(lpTmpData));
 	CookieSupported  = 1;
 	AutoRedirect	 = 1;
+	MaximumRedirects = MAXIMUM_HTTP_REDIRECT_DEEP;
 	return(1);
 }
 /*******************************************************************************************************/
@@ -161,6 +163,7 @@ HHANDLE::~HHANDLE()
 	memset(lpTmpData,0,sizeof(lpTmpData));
 	CookieSupported  = 1;
 	AutoRedirect	 = 1;
+	MaximumRedirects = MAXIMUM_HTTP_REDIRECT_DEEP;
 }
 
 /*******************************************************************************************************/

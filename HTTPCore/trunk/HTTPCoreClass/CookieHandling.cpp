@@ -399,11 +399,17 @@ int CookieStatus::ParseCookieData(char *lpCookieData, const char *lpPath, const 
 			}
 			else if IS_EXPIRES(start)
 			{
-				ExtractDate(end,&expire);
-				CurrentTime = time(NULL);
-				struct tm *test = gmtime(&CurrentTime);
-				CurrentTime = mktime(test);
-				if (CurrentTime>expire) deletecookie =1;
+				expire = ExtractDate(end);
+				if (expire ==(time_t)-1)
+				{
+                	deletecookie=1;
+				} else
+				{
+					CurrentTime = time(NULL);
+					struct tm *test = gmtime(&CurrentTime);
+					CurrentTime = mktime(test);
+					if (CurrentTime>expire) deletecookie =1;
+                }
 				if (deletecookie)
 				{
                 	printf("OLD DATE: %s\n",end);
@@ -559,21 +565,21 @@ void CookieStatus::InsertCookieToList(struct CookieList *List,char *path, char *
 
 
 
-BOOL CookieStatus::ExtractDate(char *lpdate,time_t *expires )
+time_t CookieStatus::ExtractDate(char *lpdate )
 {
 	struct tm expirestm;
 
 	if (strptime(lpdate, COOKIETIMEFORMAT, &expirestm))
 	{
-		*expires = mktime(&expirestm);
-		return(1);
-	} else if (strptime(lpdate, COOKIETIMEFORMAT2, &expirestm)) {
+		return ( mktime(&expirestm) );
+
+	} else if (strptime(lpdate, COOKIETIMEFORMAT2, &expirestm))
+	{
 		expirestm.tm_year += 1900;
-		*expires = mktime(&expirestm);
-		return(1);
+		return ( mktime(&expirestm) );
 	}
 //	printf("Invalid data\n");
-	return(0);
+	return(-1);
 
 }
 

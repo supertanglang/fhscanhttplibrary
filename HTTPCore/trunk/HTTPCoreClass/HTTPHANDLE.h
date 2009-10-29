@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAXIMUM_HTTP_REDIRECT_DEEP 2
 class HHANDLE {
 	long 		target;
 	HTTPCHAR	targetDNS[256];
@@ -37,6 +38,7 @@ class HHANDLE {
 
 	int 		CookieSupported;
 	int			AutoRedirect;
+	int 		MaximumRedirects;
 public:
 
 //Definir como metodos restringidos a CONEXION!
@@ -67,7 +69,14 @@ public:
 	void SetLastRequestedUri(const char *url)
 	{
 		if (LastRequestedUri) free(LastRequestedUri);
-		LastRequestedUri = strdup(url);
+		if (url)
+		{
+			LastRequestedUri = strdup(url);
+		} else
+		{
+         	LastRequestedUri = NULL;
+        }
+
     }
 
 	char *GetLastAuthenticationString() { return LastAuthenticationString; }
@@ -93,6 +102,11 @@ public:
 	char *GetAdditionalHeaderValue(const char *value,int n);
 	int IsCookieSupported(void) { return CookieSupported; }
 	int IsAutoRedirectEnabled(void) { return ( AutoRedirect); }
+
+	int GetMaximumRedirects(void) { return (MaximumRedirects); }
+	void DecrementMaximumRedirectsCount(void) { MaximumRedirects--; }
+	void ResetMaximumRedirects(void) { MaximumRedirects = MAXIMUM_HTTP_REDIRECT_DEEP; }
+
 
 
 };
