@@ -1,0 +1,52 @@
+#labels Phase-Implementation,Featured
+#Fhscan HTTP Library allows to create a proxy instance.
+
+= Introduction =
+
+Are you looking for a tiny and small HTTP Proxy for windows and linux? This is probably what you are looking for.
+
+
+= Details =
+Fhscan HTTP Api is really easy to use. You just need two lines of code to create a new HTTP Proxy instance.
+
+{{{
+ HTTPAPI *api = new (HTTPAPI);	
+ api->InitHTTPProxy("127.0.0.1","8080");
+}}}
+
+If you need something more advanced, for example logging all the HTTP Traffic, the following Callback example is all what you need.
+
+*HTTP Proxy Source code:*
+
+{{{
+#include "HTTP.h"
+
+int CBLog(int cbType,HTTPAPI *api, HTTPHANDLE HTTPHandle, PHTTP_DATA  request, PHTTP_DATA response)
+{
+ if ( (request) && (response))
+ {
+   char *data =request->GetRequestedURL();
+   char status = response->GetStatus();
+   char *method =request->GetHTTPMethod();
+   if (method)
+   {
+     printf("%-6s %-40s %.4s %3.3i %5.i %s\n",method,api->GetHTTPConfig(HTTPHandle,OPT_HTTP_HOST),api->GetHTTPConfig(HTTPHandle,OPT_HTTP_PORT),response->GetStatus(),response->DataSize, data);
+     free(method);
+   }
+   free(data);
+ }
+ return(CBRET_STATUS_NEXT_CB_CONTINUE);
+}
+
+int main(int argc, char *argv) 
+{
+ HTTPAPI *api = new (HTTPAPI);	
+ api->RegisterHTTPCallBack( CBTYPE_CLIENT_RESPONSE,(HTTP_IO_REQUEST_CALLBACK)CBLog,"HTTP Proxy Logger");
+ api->InitHTTPProxy("127.0.0.1","8080");
+ printf("[+] Proxy running. Press any key to exit\n\n");
+
+ getchar();
+ api->StopHTTPProxy();
+}
+
+}}}
