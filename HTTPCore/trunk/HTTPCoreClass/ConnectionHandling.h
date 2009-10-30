@@ -108,8 +108,8 @@
 
 
 
-
-#define HTTP_CONN_TIMEOUT 10
+#define HTTP_READ_TIMEOUT		10
+#define HTTP_CONN_TIMEOUT		10
 #define BUFFSIZE								4096 //default read buffer
 #define MAX_CHECK_TIME_FOR_BW_UTILIZATION  200
 #define HTTP_CONN_TIMEOUT 10
@@ -120,6 +120,7 @@
 #define ERROR_MORE_DATA_NEEDED 					-1
 #define ERROR_PARSING_DATA     					0xFFFFFF
 
+#define TARGET_FREE   							0
 
 class ConnectionHandling {
 	long 			 target;

@@ -173,16 +173,16 @@ int HHANDLE::SetHTTPConfig(int opt,int parameter)
 	sprintf(tmp,"%i",parameter);
 	switch (opt)
 	{
-		case OPT_HTTP_PROXY_ASYNC:
+		case ConfigAsyncronousProxy:
 			AsyncHTTPRequest = parameter;
 			break;
 
-		case OPT_HTTP_MAXSPEED_DOWNLOAD:
+		case ConfigMaxDownloadSpeed:
 			if (DownloadBwLimit) free(DownloadBwLimit);
 			DownloadBwLimit = strdup(tmp);
 			break;
 
-		case OPT_HTTP_PROXY_PORT:
+		case ConfigProxyPort:
 			if (lpProxyPort) free(lpProxyPort);
 			if (parameter) {
 				lpProxyPort=strdup(tmp);
@@ -190,10 +190,10 @@ int HHANDLE::SetHTTPConfig(int opt,int parameter)
 				lpProxyPort=NULL;
 			}
 			break;
-		case OPT_HTTP_PROTOCOL:
+		case ConfigProtocolversion:
 			version=parameter;
 			break;
-		case OPT_HTTP_MAX_DOWNLOAD_SIZE:
+		case ConfigMaxDownloadSize:
 			if (DownloadLimit) free(DownloadLimit);
 			if (parameter) {
 				DownloadLimit = strdup(tmp);
@@ -201,10 +201,10 @@ int HHANDLE::SetHTTPConfig(int opt,int parameter)
 				DownloadLimit = NULL;
 			}
 			break;
-		case OPT_HTTP_HANDLE_COOKIES:
+		case ConfigCookieHandling:
 			CookieSupported=parameter;
 			break;
-		case OPT_HTTP_AUTOREDIRECT:
+		case ConfigAutoredirect:
 			AutoRedirect=parameter;
 			break;
 		default:
@@ -221,11 +221,11 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 
 	switch (opt)
 	{
-	case OPT_HTTP_PROXY_ASYNC:
+	case ConfigAsyncronousProxy:
 			AsyncHTTPRequest = atoi(parameter);
 		break;
 
-	case OPT_HTTP_MAXSPEED_DOWNLOAD:
+	case ConfigMaxDownloadSpeed:
 		if (DownloadBwLimit) free(DownloadBwLimit);
 		if (parameter)
 		{			 
@@ -234,7 +234,7 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 			DownloadBwLimit = NULL;
 		}
 		break;
-	case OPT_HTTP_COOKIE:
+	case ConfigCookie:
 		if (Cookie)
 		{
 			free(Cookie);
@@ -253,7 +253,7 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 		}
 		break;
 
-	case OPT_HTTP_HEADER:
+	case ConfigAdditionalHeader:
 		if (AdditionalHeader) 
 		{
 			free(AdditionalHeader);			
@@ -273,7 +273,7 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 		}
 		break;
 
-	case OPT_HTTP_USERAGENT:
+	case ConfigUserAgent:
 		if (UserAgent) {
 			free(UserAgent);
 		}
@@ -283,7 +283,7 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 			UserAgent=NULL;
 		}
 		break;
-	case OPT_HTTP_PROXY_HOST:
+	case ConfigProxyHost:
 		if (lpProxyHost) {
 			free(lpProxyHost);
 			lpProxyHost=NULL;
@@ -317,7 +317,7 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 		if (!lpProxyPort) lpProxyPort=strdup("8080");
 		break;
 
-	case OPT_HTTP_PROXY_PORT:
+	case ConfigProxyPort:
 		if (lpProxyPort) free(lpProxyPort);
 		if (parameter) {	
 			lpProxyPort=strdup(parameter);
@@ -326,7 +326,7 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 		}
 		break;
 
-	case OPT_HTTP_PROXY_USER:
+	case ConfigProxyUser:
 		if (lpProxyUserName) {
 			free(lpProxyUserName);
 		}
@@ -335,7 +335,7 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 		} else lpProxyUserName=NULL;
 		break;
 
-	case OPT_HTTP_PROXY_PASS:
+	case ConfigProxyPass:
 		if (lpProxyPassword) {
 			free(lpProxyPassword);
 		}
@@ -344,12 +344,12 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 		} else lpProxyPassword=NULL;
 		break;
 
-	case OPT_HTTP_PROTOCOL:
+	case ConfigProtocolversion:
 		if (parameter) {
 			version=atoi(parameter);
 		} else version=1;
 		break;
-	case OPT_HTTP_MAX_DOWNLOAD_SIZE:
+	case ConfigMaxDownloadSize:
 		if (DownloadLimit) free(DownloadLimit);		
 		if (parameter) {
 			DownloadLimit = strdup(parameter);
@@ -357,10 +357,10 @@ int HHANDLE::SetHTTPConfig(int opt,HTTPCSTR parameter)
 			DownloadLimit = NULL;
 		}
 		break;
-	case OPT_HTTP_HANDLE_COOKIES:
+	case ConfigCookieHandling:
 		CookieSupported=atoi(parameter);
 		break;
-	case OPT_HTTP_AUTOREDIRECT:
+	case ConfigAutoredirect:
 			AutoRedirect=atoi(parameter);;
 			break;
 	default:
@@ -376,31 +376,31 @@ HTTPSTR HHANDLE::GetHTTPConfig(int opt)
 
 	switch(opt)
 	{
-	case OPT_HTTP_HOST:
+	case ConfigHTTPHost:
 		return (targetDNS);
-	case OPT_HTTP_PORT:
+	case ConfigHTTPPort:
 		sprintf(lpTmpData,"%i",port);
 		return (lpTmpData);
-	case OPT_HTTP_MAXSPEED_DOWNLOAD:
+	case ConfigMaxDownloadSpeed:
 		return(NULL);
-	case OPT_HTTP_COOKIE:
+	case ConfigCookie:
 		return ( Cookie );
-	case OPT_HTTP_HEADER:
+	case ConfigAdditionalHeader:
 		return ( AdditionalHeader );
-	case OPT_HTTP_USERAGENT:
+	case ConfigUserAgent:
 		return ( UserAgent);
-	case OPT_HTTP_PROXY_HOST:
+	case ConfigProxyHost:
 		return ( lpProxyHost);
-	case OPT_HTTP_PROXY_PORT:
+	case ConfigProxyPort:
 		return(lpProxyPort);
-	case OPT_HTTP_PROXY_USER:
+	case ConfigProxyUser:
 		return ( lpProxyUserName );
-	case OPT_HTTP_PROXY_PASS:
+	case ConfigProxyPass:
 		return ( lpProxyPassword );
-	case OPT_HTTP_PROTOCOL:
+	case ConfigProtocolversion:
 		sprintf(lpTmpData,"%i",version);
 		return (lpTmpData);
-	case OPT_HTTP_SSL_SUPPORTED:
+	case ConfigSSLSupported:
 		#ifdef _OPENSSL_SUPPORT_
 		strcpy(lpTmpData,"1");
 		#else
@@ -408,16 +408,16 @@ HTTPSTR HHANDLE::GetHTTPConfig(int opt)
 		#endif
 		return (lpTmpData);
 	#ifdef _OPENSSL_SUPPORT_
-	case OPT_HTTP_SSL_CONNECTION:
+	case ConfigSSLConnection:
 		sprintf(lpTmpData,"%i",NeedSSL);
 		return (lpTmpData);
 	#endif
-	case OPT_HTTP_MAX_DOWNLOAD_SIZE:
+	case ConfigMaxDownloadSize:
 		return (DownloadLimit);
-	case OPT_HTTP_HANDLE_COOKIES:
+	case ConfigCookieHandling:
 		sprintf(lpTmpData,"%i",CookieSupported);
 		return (lpTmpData);
-	case OPT_HTTP_AUTOREDIRECT:
+	case ConfigAutoredirect:
 		sprintf(lpTmpData,"%i",AutoRedirect);
 		return (lpTmpData);
 	}

@@ -339,7 +339,7 @@ ConnectionHandling::~ConnectionHandling()
 	}
 }
 
-int ConnectionHandling::GetConnection(class HHANDLE *HTTPHandle) //, PHTTP_DATA request, unsigned long *id)
+int ConnectionHandling::GetConnection(class HHANDLE *HTTPHandle) 
 {
 	if (datasock==0)
 	{
@@ -352,7 +352,7 @@ int ConnectionHandling::GetConnection(class HHANDLE *HTTPHandle) //, PHTTP_DATA 
 
 		if (HTTPHandle->ProxyEnabled())
 		{
-			port=atoi(HTTPHandle->GetHTTPConfig(OPT_HTTP_PROXY_PORT));
+			port=atoi(HTTPHandle->GetHTTPConfig(ConfigProxyPort));
 			ConnectionAgainstProxy=1;
 		} else
 		{
