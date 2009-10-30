@@ -78,7 +78,8 @@ char *httpdata::GetRequestedURL()
 		char *q=p;
 		while (*q)
 		{
-			if ( (*q==' ') || (*q=='?') || (*q=='&') || (*q=='\r') || (*q=='\n') )
+			//if ( (*q==' ') || (*q=='?') || (*q=='&') || (*q=='\r') || (*q=='\n') )
+			if ( (*q==' ') || (*q=='\r') || (*q=='\n') )
 			break;
 			len++; q++;
 		}

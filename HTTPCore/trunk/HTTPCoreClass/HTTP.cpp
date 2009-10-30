@@ -15,17 +15,15 @@
 #pragma comment(lib,"ws2_32.lib")
 #endif
 
-
-#define MAX_HEADER_SIZE     8192
-#define MAX_POST_LENGTH  	8192
-#define MAX_DOWNLOAD_SIZE 	MAX_POST_LENGTH*20
-#define PURGETIME						20  //20 secconds
-#define MAX_INACTIVE_CONNECTION 		10000000 *PURGETIME
-#define FHSCANUSERAGENT 				"Mozilla/5.0 (compatible; MSIE 7.0; FHScan Core 1.3)"
-
 #include <iostream>
 #include <string>
 using namespace std;
+
+
+#define PURGETIME						20  //20 secconds
+#define MAX_INACTIVE_CONNECTION 		10000000 *PURGETIME
+#define FHSCANUSERAGENT 				"Mozilla/5.0 (compatible; MSIE 7.0; FHScan Core 1.3)"
+#define MAX_HEADER_SIZE					8192
 
 struct params {
 	void *classptr;
@@ -65,6 +63,21 @@ prequest::~prequest()
 	if (ContentType)	free(ContentType);
 	if (url)			free(url);
 	if (Parameters)		free(Parameters);
+}
+
+int prequest::IsValidHTTPResponse(void) 
+{ 
+	return ((response) && (response->Header) && (response->HeaderSize) && (status>100) && (status<520) ) ; 
+}
+
+int prequest::HasResponseHeader(void) 
+{ 
+	return ( (response) && (response->HeaderSize) && (response->Header) ); 
+}
+
+int prequest::HasResponseData(void) 
+{   
+	return ( (response) && (response->DataSize) && (response->Data)   ); 
 }
 
 /*******************************************************************************************************/
@@ -144,7 +157,7 @@ HTTPAPI::~HTTPAPI()
 
 }
 /*******************************************************************************************************/
-int HTTPAPI::SetHTTPConfig(HTTPHANDLE HTTPHandle,int opt, HTTPCSTR parameter)
+int HTTPAPI::SetHTTPConfig(HTTPHANDLE HTTPHandle,enum HttpOptions opt, HTTPCSTR parameter)
 {
 	if (HTTPHandle == GLOBAL_HTTP_CONFIG)
 	{
@@ -159,7 +172,7 @@ int HTTPAPI::SetHTTPConfig(HTTPHANDLE HTTPHandle,int opt, HTTPCSTR parameter)
 	return(0);
 }
 /*******************************************************************************************************/
-int HTTPAPI::SetHTTPConfig(HTTPHANDLE HTTPHandle,int opt, int parameter)
+int HTTPAPI::SetHTTPConfig(HTTPHANDLE HTTPHandle,enum HttpOptions opt, int parameter)
 {
 	if (HTTPHandle == GLOBAL_HTTP_CONFIG)
 	{
@@ -174,7 +187,7 @@ int HTTPAPI::SetHTTPConfig(HTTPHANDLE HTTPHandle,int opt, int parameter)
 	return(0);
 }
 /*******************************************************************************************************/
-HTTPSTR	HTTPAPI::GetHTTPConfig(HTTPHANDLE HTTPHandle,int opt)
+HTTPSTR	HTTPAPI::GetHTTPConfig(HTTPHANDLE HTTPHandle,enum HttpOptions opt)
 {
 	if (HTTPHandle == GLOBAL_HTTP_CONFIG)
 	{
@@ -202,17 +215,17 @@ HTTPHANDLE HTTPAPI::InitHTTPConnectionHandle(HTTPSTR lpHostName,int port,int ssl
 				HTTPHandleTable[i]=HTTPHandle;
 				HandleLock.UnLockMutex();
 
-				HTTPHandle->SetHTTPConfig(OPT_HTTP_HANDLE_COOKIES,GlobalHTTPCoreApiOptions.GetHTTPConfig(OPT_HTTP_HANDLE_COOKIES));
-				HTTPHandle->SetHTTPConfig(OPT_HTTP_AUTOREDIRECT,GlobalHTTPCoreApiOptions.GetHTTPConfig(OPT_HTTP_AUTOREDIRECT));
+				HTTPHandle->SetHTTPConfig(ConfigCookieHandling,GlobalHTTPCoreApiOptions.GetHTTPConfig(ConfigCookieHandling));
+				HTTPHandle->SetHTTPConfig(ConfigAutoredirect,  GlobalHTTPCoreApiOptions.GetHTTPConfig(ConfigAutoredirect));
 
 				if (GlobalHTTPCoreApiOptions.ProxyEnabled() )
 				{
-					HTTPHandle->SetHTTPConfig(OPT_HTTP_PROXY_HOST,GlobalHTTPCoreApiOptions.GetHTTPConfig(OPT_HTTP_PROXY_HOST));
-					HTTPHandle->SetHTTPConfig(OPT_HTTP_PROXY_PORT,GlobalHTTPCoreApiOptions.GetHTTPConfig(OPT_HTTP_PROXY_PORT));
-					if (GlobalHTTPCoreApiOptions.GetHTTPConfig(OPT_HTTP_PROXY_USER))
+					HTTPHandle->SetHTTPConfig(ConfigProxyHost,GlobalHTTPCoreApiOptions.GetHTTPConfig(ConfigProxyHost));
+					HTTPHandle->SetHTTPConfig(ConfigProxyPort,GlobalHTTPCoreApiOptions.GetHTTPConfig(ConfigProxyPort));
+					if (GlobalHTTPCoreApiOptions.GetHTTPConfig(ConfigProxyUser))
 					{
-						HTTPHandle->SetHTTPConfig(OPT_HTTP_PROXY_USER,GlobalHTTPCoreApiOptions.GetHTTPConfig(OPT_HTTP_PROXY_USER));
-						HTTPHandle->SetHTTPConfig(OPT_HTTP_PROXY_PASS,GlobalHTTPCoreApiOptions.GetHTTPConfig(OPT_HTTP_PROXY_PASS));
+						HTTPHandle->SetHTTPConfig(ConfigProxyUser,GlobalHTTPCoreApiOptions.GetHTTPConfig(ConfigProxyUser));
+						HTTPHandle->SetHTTPConfig(ConfigProxyPass,GlobalHTTPCoreApiOptions.GetHTTPConfig(ConfigProxyPass));
 					}
 					/*set additional Global HTTP options if needed ... */
 				}
@@ -224,7 +237,11 @@ HTTPHANDLE HTTPAPI::InitHTTPConnectionHandle(HTTPSTR lpHostName,int port,int ssl
 	delete HTTPHandle;
 	return(-1);
 }
-
+/*******************************************************************************************************/
+HTTPHANDLE	HTTPAPI::InitHTTPConnectionHandle(HTTPSTR lpHostName,int port) 
+{  
+	return InitHTTPConnectionHandle(lpHostName,port,0); 
+}
 /*******************************************************************************************************/
 
 int HTTPAPI::EndHTTPConnectionHandle(HTTPHANDLE UserHandle)
@@ -252,18 +269,7 @@ class HHANDLE *HTTPAPI::GetHHANDLE(HTTPHANDLE HTTPHandle)
 	}
 	return (NULL);
 }
-/*******************************************************************************************************/
-HTTPAPI::HTTPAPI(HTTPSTR lpProxyHost, HTTPSTR lpProxyPort, HTTPSTR lpUserName = NULL, HTTPSTR lpPassword = NULL)
-{
-	HTTPAPI();
-	GlobalHTTPCoreApiOptions.SetHTTPConfig(OPT_HTTP_PROXY_HOST,lpProxyHost);
-	GlobalHTTPCoreApiOptions.SetHTTPConfig(OPT_HTTP_PROXY_PORT,lpProxyPort);
-	if (lpUserName)
-	{
-		GlobalHTTPCoreApiOptions.SetHTTPConfig(OPT_HTTP_PROXY_USER,lpUserName);
-		GlobalHTTPCoreApiOptions.SetHTTPConfig(OPT_HTTP_PROXY_PASS,lpPassword);
-	}
-}
+
 /*******************************************************************************************************/
 void  HTTPAPI::CleanConnectionTable(LPVOID *unused)
 {
@@ -1203,8 +1209,8 @@ int	HTTPAPI::InitHTTPProxy(HTTPCSTR hostname, unsigned short port)
 #endif
 		ProxyEngine.InitThread((void*)ListenConnectionThreadFunc,(void*)this);
 		/* This is disabled by default in our Proxy server */
-		this->SetHTTPConfig(GLOBAL_HTTP_CONFIG,OPT_HTTP_HANDLE_COOKIES,0);
-		this->SetHTTPConfig(GLOBAL_HTTP_CONFIG,OPT_HTTP_AUTOREDIRECT,0);
+		this->SetHTTPConfig(GLOBAL_HTTP_CONFIG,ConfigCookieHandling,0);
+		this->SetHTTPConfig(GLOBAL_HTTP_CONFIG,ConfigAutoredirect,0);
 		return(1);
 	}
 }
@@ -1226,6 +1232,12 @@ int	HTTPAPI::StopHTTPProxy(void)
 	return  (1);
 
 }
+
+/* some proxy defines */
+#define REQUEST_ACCEPTED						0
+#define BAD_REQUEST_NO_REQUEST_FOUND 			1
+#define BAD_REQUEST_CANT_PARSE_REQUEST 			2
+#define BAD_REQUEST_NULL_URL					3
 
 /*******************************************************************************/
 //! This is the main HTTP Proxy function that reads for user requests and translates them to requests sent against remote HTTP hosts.
@@ -1389,7 +1401,7 @@ int HTTPAPI::DispatchHTTPProxyRequest(void *ListeningConnection)
 					connect=0;
 				} else
 				{
-					SetHTTPConfig(HTTPHandle,OPT_HTTP_PROTOCOL,line+strlen(line)-1);
+					SetHTTPConfig(HTTPHandle,ConfigProtocolversion,line+strlen(line)-1);
 					if (AsyncHTTPRequest) 
 					{
 						GetHHANDLE(HTTPHandle)->SetClientConnection(ClientConnection);
@@ -1429,7 +1441,7 @@ int HTTPAPI::DispatchHTTPProxyRequest(void *ListeningConnection)
 
 							if  (UseOriginalUserAgent) 
 							{   /* By default SendHttpRequest() will append their own user-Agent header, so we must override it */
-								SetHTTPConfig(HTTPHandle,OPT_HTTP_USERAGENT,NULL);
+								SetHTTPConfig(HTTPHandle,ConfigUserAgent,NULL);
 							}
 
 							do	
@@ -1455,7 +1467,7 @@ int HTTPAPI::DispatchHTTPProxyRequest(void *ListeningConnection)
 									{
 										if ( (UseOriginalUserAgent) && (strncmp(p,"User-Agent:",11)==0))
 										{
-											SetHTTPConfig(HTTPHandle,OPT_HTTP_USERAGENT,p+12);
+											SetHTTPConfig(HTTPHandle,ConfigUserAgent,p+12);
 										} 
 									}
 									free(p);
@@ -1481,14 +1493,14 @@ int HTTPAPI::DispatchHTTPProxyRequest(void *ListeningConnection)
 							if (ClientRequest)
 							{
 								ClientRequest[ClientRequestLength ]=0;
-								SetHTTPConfig(HTTPHandle,OPT_HTTP_HEADER,ClientRequest);
+								SetHTTPConfig(HTTPHandle,ConfigAdditionalHeader,ClientRequest);
 								free(ClientRequest);
 							}
 							/* Send request to the remote HTTP Server */
 							PREQUEST data = SendHttpRequest(HTTPHandle,vhost ? vhost : host,method,path,ProxyRequest->Data,ProxyRequest->DataSize,NULL,NULL,NO_AUTH);
 
 							/* Clean the HTTPHandle options */
-							SetHTTPConfig(HTTPHandle,OPT_HTTP_HEADER,NULL);
+							SetHTTPConfig(HTTPHandle,ConfigAdditionalHeader,NULL);
 							if (vhost) free(vhost);
 
 							if   (data) 
@@ -1583,6 +1595,8 @@ int HTTPAPI::DispatchHTTPProxyRequest(void *ListeningConnection)
 	return(1);
 }
 /****************************************************************************************/
+
+
 int HTTPAPI::ParseRequest(HTTPSTR line, HTTPSTR method,  HTTPSTR host, HTTPSTR path, int *port)
 {
 	int iport;
@@ -1687,27 +1701,27 @@ int HTTPAPI::SkipHeader(HTTPSTR header)
 \return This function doest not return information, as its not needed.
 \note if parameter is NULL, the operation is ignored.
 /*******************************************************************************/
-void HTTPAPI::SetHTTPProxyConfig(int opt,HTTPSTR parameter)
+void HTTPAPI::SetHTTPProxyConfig(enum HttpProxyoptions  opt,HTTPSTR parameter)
 {
 	if (!parameter) return;
 	switch (opt)
 	{
-	case OPT_HTTPPROXY_ALLOWCONNECT:
+	case ProxyAllowConnect:
 		ConnectMethodAllowed = atoi(parameter);
 		break;
-	case OPT_HTTPPROXY_ANONYMOUSPROXY:
+	case ProxyAnonymous:
 		AnonymousProxy = atoi(parameter);
 		break;
-	case OPT_HTTPPROXY_ASYNCREQUEST:
+	case ProxyAsynRequest:
 		AsyncHTTPRequest = atoi(parameter);
 		break;
-	case OPT_HTTPPROXY_DISABLECACHE:
+	case ProxyDisableCache:
 		DisableBrowserCache = atoi(parameter);
 		break;
-	case OPT_HTTPPROXY_ORIGINALUSERAGENT:
+	case ProxyOriginalUserAgent:
 		UseOriginalUserAgent = atoi(parameter);
 		break;	
-	case OPT_HTTPPROXY_FORCE_DEFAULT_HTTP_PORTS:
+	case ProxyDefaultPorts:
 		ForceDefaultHTTPPorts = atoi(parameter);
 		break;
 	}
@@ -1716,26 +1730,26 @@ void HTTPAPI::SetHTTPProxyConfig(int opt,HTTPSTR parameter)
 
 /*******************************************************************************/
 /*******************************************************************************/
-void HTTPAPI::SetHTTPProxyConfig(int opt,int parameter)
+void HTTPAPI::SetHTTPProxyConfig(enum HttpProxyoptions  opt,int parameter)
 {
 	switch (opt)
 	{
-	case OPT_HTTPPROXY_ALLOWCONNECT:
+	case ProxyAllowConnect:
 		ConnectMethodAllowed = parameter;
 		break;
-	case OPT_HTTPPROXY_ANONYMOUSPROXY:
+	case ProxyAnonymous:
 		AnonymousProxy = parameter;
 		break;
-	case OPT_HTTPPROXY_ASYNCREQUEST:
+	case ProxyAsynRequest:
 		AsyncHTTPRequest = parameter;
 		break;
-	case OPT_HTTPPROXY_DISABLECACHE:
+	case ProxyDisableCache:
 		DisableBrowserCache = parameter;
 		break;
-	case OPT_HTTPPROXY_ORIGINALUSERAGENT:
+	case ProxyOriginalUserAgent:
 		UseOriginalUserAgent = parameter;
 		break;	
-	case OPT_HTTPPROXY_FORCE_DEFAULT_HTTP_PORTS:
+	case ProxyDefaultPorts:
 		ForceDefaultHTTPPorts = parameter;
 		break;
 	}
